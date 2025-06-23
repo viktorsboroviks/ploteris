@@ -95,7 +95,7 @@ def get_plot_filename(
 ) -> str:
     prefix = config_json["plot"]["output"][config_key]["path_prefix"]
     postfix = config_json["plot"]["output"][config_key]["path_postfix"]
-    assert i is None == i_max is None
+    assert (i is None) == (i_max is None)
     if i is None:
         i_str = ""
     else:
@@ -125,7 +125,7 @@ class Ploteris:
 
         output_config_json = self.config_json["plot"]["output"][self.config_key]
         if "idx" in output_config_json and len(output_config_json["idx"]) > 0:
-            self.idx = get_idx(self.config_json, self.data)
+            self.idx = get_idx(output_config_json, self.data)
 
     # virtual
     def get_plot(self, i: int) -> vplot.PlotlyPlot:
@@ -133,7 +133,7 @@ class Ploteris:
 
     def plot_plot(self, i: int = None):
 
-        assert i is None == self.idx is None
+        assert (i is None) == (self.idx is None)
         if i is not None:
             i_max = self.idx[-1]
         else:
