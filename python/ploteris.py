@@ -27,17 +27,29 @@ def paths_dict(path_prefix: str, path_postfix) -> dict[int, str]:
 
 
 def data_from_path(
-    path: str, index_col: str = None, parse_dates: bool = False
+    path: str, index_col: str = None, parse_dates: bool = False, dict_by: str = None
 ) -> pd.DataFrame:
     assert isinstance(path, str)
-    data = pd.read_csv(path, index_col=index_col, parse_dates=parse_dates)
+
+    csv_data = pd.read_csv(path, index_col=index_col, parse_dates=parse_dates)
     if parse_dates:
-        assert isinstance(data.index, pd.DatetimeIndex)
-    return data
+        assert isinstance(csv_data.index, pd.DatetimeIndex)
+
+    if dict_by is not None:
+        data = {}
+        # csv_data into dictionaries based on unique values in dict_by column
+        for value, group in csv_data.groupby(dict_by):
+            data[value] = group
+        return data
+
+    return csv_data
 
 
 def data_from_paths(
-    paths: dict[int, str], index_col: str, parse_dates: bool = False
+    paths: dict[int, str],
+    index_col: str,
+    parse_dates: bool = False,
+    dict_by: str = None,
 ) -> dict[pd.DataFrame]:
     assert isinstance(paths, dict)
     data_dict = {}
@@ -45,7 +57,7 @@ def data_from_paths(
         assert isinstance(key, int)
         assert isinstance(path, str)
         assert key not in data_dict
-        data_dict[key] = data_from_path(path, index_col)
+        data_dict[key] = data_from_path(path, index_col, parse_dates, dict_by)
     return data_dict
 
 
@@ -59,50 +71,55 @@ def get_data(config_json: str) -> dict[str, pd.DataFrame]:
         path_postfix = entry.get("path_postfix", None)
         index_col = entry.get("index_col", None)
         parse_dates = entry.get("parse_dates", False)
+        dict_by = entry.get("dict_by", None)
 
         if path:
-            data_dict[key] = data_from_path(path, index_col, parse_dates)
+            data_dict[key] = data_from_path(
+                path,
+                index_col,
+                parse_dates,
+                dict_by,
+            )
         else:
             data_dict[key] = data_from_paths(
                 paths_dict(path_prefix, path_postfix),
                 index_col,
                 parse_dates,
+                dict_by,
             )
     return data_dict
 
 
-def get_idx(config_json: str, data: dict[str, pd.DataFrame], sort=True):
-    idx = config_json.get("idx", None)
-    if idx not in (None, ""):
-        assert isinstance(idx, list)
-        return sorted(idx)
+def get_data_idx(config_json: str, sort=True):
+    if "data_idx" not in config_json or len(config_json["data_idx"]) == 0:
+        return None
 
-    idx_data = config_json["idx_data"]
-    assert idx_data in data
-    if isinstance(data[idx_data], dict):
-        idx = data[idx_data].keys()
-    elif isinstance(data[idx_data], pd.DataFrame):
-        idx = data[idx_data].index
-    else:
-        assert False
-    if sort:
-        idx = sorted(idx)
-    return idx
+    idx = config_json.get("data_idx", None)
+    assert idx not in (None, "")
+    assert isinstance(idx, list)
+    return sorted(idx)
+
+
+def get_plot_idx(config_json: str, sort=True):
+    if "plot_idx" not in config_json or len(config_json["plot_idx"]) == 0:
+        return None
+
+    idx = config_json.get("plot_idx", None)
+    assert idx not in (None, "")
+    assert isinstance(idx, list)
+    return sorted(idx)
 
 
 def get_plot_filename(
-    config_json: str, config_key: str, i: int = None, i_max: int = None
+    config_json: str, config_key: str, data_i: int = None, plot_i: int = None
 ) -> str:
+    str_splitter = "_" if plot_i is not None else ""
+    str_data_i = str(data_i) if data_i is not None else ""
+    str_plot_i = str(plot_i) if plot_i is not None else ""
+
     prefix = config_json["plot"]["output"][config_key]["path_prefix"]
     postfix = config_json["plot"]["output"][config_key]["path_postfix"]
-    assert (i is None) == (i_max is None)
-    if i is None:
-        i_str = ""
-    else:
-        i_max_len = len(str(i_max))
-        assert len(str(i)) <= i_max_len
-        i_str = str(i).zfill(i_max_len)
-    return f"{prefix}{i_str}{postfix}"
+    return f"{prefix}{str_data_i}{str_splitter}{str_plot_i}{postfix}"
 
 
 # Ploteris
@@ -112,7 +129,8 @@ class Ploteris:
     config_json: str
     config_key: str
     data: dict
-    idx: list = None
+    data_idx: list = None
+    plot_idx: list = None
 
     def __init__(self, config_path, config_key: str):
         with open(config_path) as f:
@@ -123,36 +141,45 @@ class Ploteris:
         # get data from files as tables to be used
         self.data = get_data(self.config_json["plot"]["data"])
 
-        output_config_json = self.config_json["plot"]["output"][self.config_key]
-        if "idx" in output_config_json and len(output_config_json["idx"]) > 0:
-            self.idx = get_idx(output_config_json, self.data)
+        # get idx from filepaths
+        self.data_idx = get_data_idx(
+            self.config_json["plot"]["output"][self.config_key]
+        )
+        self.plot_idx = get_plot_idx(
+            self.config_json["plot"]["output"][self.config_key]
+        )
 
     # virtual
-    def get_plot(self, i: int) -> vplot.PlotlyPlot:
+    def get_plot(self, data_i: int, plot_i: int) -> vplot.PlotlyPlot:
         raise NotImplementedError()
 
-    def plot_plot(self, i: int = None):
+    def plot_plot(self, data_i: int = None, plot_i: int = None):
+        assert (data_i is None) == (self.data_idx is None)
 
-        assert (i is None) == (self.idx is None)
-        if i is not None:
-            i_max = self.idx[-1]
-        else:
-            i_max = None
-
-        plot_filename = get_plot_filename(self.config_json, self.config_key, i, i_max)
-        plot = self.get_plot(i)
+        plot_filename = get_plot_filename(
+            self.config_json, self.config_key, data_i, plot_i
+        )
+        plot = self.get_plot(data_i, plot_i)
         if ".html" in plot_filename:
             plot.width = None
             plot.height = None
         plot.to_file(plot_filename)
+        print(f"[v] created {plot_filename}")
 
     def plot_plots(self):
-        assert self.idx is not None
-        assert len(self.idx) > 0
+        assert self.data_idx is not None
+        assert len(self.data_idx) > 0
 
-        for i in self.idx:
-            assert isinstance(i, int)
-            self.plot_plot(i)
+        for data_i in self.data_idx:
+            assert isinstance(data_i, int)
+            if self.plot_idx is None:
+                self.plot_plot(data_i)
+                return
+
+            assert len(self.plot_idx) > 0
+            for plot_i in self.plot_idx:
+                assert isinstance(plot_i, int)
+                self.plot_plot(data_i, plot_i)
 
 
 # get vplot structures
