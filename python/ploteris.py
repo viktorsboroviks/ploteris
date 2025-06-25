@@ -190,7 +190,7 @@ def get_subplot_hist(
             vplot.Scatter(
                 x=[mean],
                 y=[0],
-                color=vplot.Color.RED,
+                color=vplot.Color.BLUE,
                 dash=vplot.Dash.SOLID,
                 hoverinfo="x+name",
                 name="mean",
@@ -200,7 +200,7 @@ def get_subplot_hist(
         lines += [
             vplot.Line(
                 x=[mean],
-                color=vplot.Color.RED,
+                color=vplot.Color.BLUE,
                 dash=vplot.Dash.SOLID,
             ),
         ]
@@ -211,8 +211,8 @@ def get_subplot_hist(
             vplot.Scatter(
                 x=[median],
                 y=[0],
-                color=vplot.Color.RED,
-                dash=vplot.Dash.DOT,
+                color=vplot.Color.VIOLET,
+                dash=vplot.Dash.SOLID,
                 hoverinfo="x+name",
                 name="median",
                 showlegend=False,
@@ -221,8 +221,8 @@ def get_subplot_hist(
         lines += [
             vplot.Line(
                 x=[median],
-                color=vplot.Color.RED,
-                dash=vplot.Dash.DOT,
+                color=vplot.Color.VIOLET,
+                dash=vplot.Dash.SOLID,
             ),
         ]
 
