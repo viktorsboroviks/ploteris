@@ -123,8 +123,6 @@ def get_plot_filename(
 
 
 # Ploteris
-
-
 class Ploteris:
     config_json: str
     config_key: str
@@ -468,3 +466,85 @@ def get_subplot_value(
         legendgroup_name=legendgroup_name,
     )
     return subplot
+
+
+def get_traces_price(
+    price_data: pd.DataFrame, i_dt_start=None, i_dt_end=None
+) -> list[vplot.Scatter]:
+    traces = []
+
+    # create a view of the price data, truncated if indices are provided
+    view_data = price_data
+
+    if i_dt_start is not None or i_dt_end is not None:
+        view_data = price_data.iloc[i_dt_start : i_dt_end + 1]
+
+    traces.append(
+        vplot.Scatter(
+            x=view_data.index,
+            y=view_data["Close"],
+            color=vplot.Color.LIGHT_GREY,
+            name="price",
+            showlegend=False,
+        )
+    )
+    return traces
+
+
+def get_traces_sim_ranges(
+    price_data: pd.DataFrame, states_data: pd.DataFrame, i_max: int
+) -> list[vplot.Scatter]:
+    assert isinstance(states_data, pd.DataFrame)
+
+    # add one empty trace for the legend
+    traces = []
+
+    for i, row in states_data.iterrows():
+        if i >= i_max:
+            break
+
+        dt_x = [price_data.index[x] for x in [row["i_dt_start"], row["i_dt_end"]]]
+        y = [price_data.loc[x, "Close"] for x in dt_x]
+        traces.append(
+            vplot.Scatter(
+                x=dt_x,
+                y=y,
+                color=vplot.Color.RED,
+                dash=vplot.Dash.SOLID,
+                mode="lines+text",
+                text=[f"example {i}", ""],
+                textposition="bottom center",
+                showlegend=False,
+            )
+        )
+    return traces
+
+
+def get_traces_ops(
+    price_data: pd.DataFrame, ops_data: pd.DataFrame
+) -> list[vplot.Scatter]:
+    assert isinstance(ops_data, pd.DataFrame)
+
+    # add one empty trace for the legend
+    traces = []
+    showlegend = False
+
+    # split by seq_id
+    opseq_dfs = {name: group for name, group in ops_data.groupby("seq_id")}
+    for seq_id, opseq_df in opseq_dfs.items():
+        # generate trace for every opseq
+        dt = opseq_df.index
+        assert isinstance(dt, pd.Index)
+
+        traces.append(
+            vplot.Scatter(
+                x=dt,
+                y=price_data.loc[dt, "Close"],
+                color=vplot.Color.RED,
+                name="opseq",
+                mode="lines+markers",
+                showlegend=showlegend,
+            )
+        )
+        showlegend = False
+    return traces
