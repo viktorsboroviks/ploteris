@@ -1,6 +1,7 @@
 import json
 import subprocess
 import typing
+import numpy as np
 import pandas as pd
 import vplot
 
@@ -536,15 +537,30 @@ def get_traces_ops(
         dt = opseq_df.index
         assert isinstance(dt, pd.Index)
 
-        traces.append(
-            vplot.Scatter(
-                x=dt,
-                y=price_data.loc[dt, "Close"],
-                color=vplot.Color.RED,
-                name="opseq",
-                mode="lines+markers",
-                showlegend=showlegend,
+        if len(dt) == 1:
+            assert opseq_df["skipped"].iloc[0] == "SKIPPED"
+            traces.append(
+                vplot.Scatter(
+                    x=dt,
+                    y=price_data.loc[dt, "Close"],
+                    color=vplot.Color.GREY,
+                    name=f"(skipped) opseq id:{seq_id}",
+                    mode="markers",
+                    showlegend=False,
+                )
             )
-        )
-        showlegend = False
+        else:
+            for op in opseq_df["skipped"]:
+                assert op is np.nan
+            traces.append(
+                vplot.Scatter(
+                    x=dt,
+                    y=price_data.loc[dt, "Close"],
+                    color=vplot.Color.RED,
+                    name=f"opseq id:{seq_id}",
+                    mode="lines+markers",
+                    showlegend=showlegend,
+                )
+            )
+            showlegend = False
     return traces
