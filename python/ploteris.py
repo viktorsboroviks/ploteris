@@ -3,6 +3,7 @@ import subprocess
 import typing
 import numpy as np
 import pandas as pd
+import plotly.colors
 import vplot
 
 
@@ -111,18 +112,6 @@ def get_plot_idx(config_json: str, sort=True):
     return sorted(idx)
 
 
-def get_plot_filename(
-    config_json: str, config_key: str, data_i: int = None, plot_i: int = None
-) -> str:
-    str_splitter = "_" if plot_i is not None else ""
-    str_data_i = str(data_i) if data_i is not None else ""
-    str_plot_i = str(plot_i) if plot_i is not None else ""
-
-    prefix = config_json["plot"]["output"][config_key]["path_prefix"]
-    postfix = config_json["plot"]["output"][config_key]["path_postfix"]
-    return f"{prefix}{str_data_i}{str_splitter}{str_plot_i}{postfix}"
-
-
 # Ploteris
 class Ploteris:
     config_json: str
@@ -131,22 +120,41 @@ class Ploteris:
     data_idx: list = None
     plot_idx: list = None
 
-    def __init__(self, config_path, config_key: str):
+    def __init__(
+        self,
+        config_path: str,
+        config_key: str,
+        ploteris_key: str = "ploteris",
+    ):
         with open(config_path) as f:
             self.config_json = json.load(f)
 
+        self.ploteris_key = ploteris_key
         self.config_key = config_key
 
         # get data from files as tables to be used
-        self.data = get_data(self.config_json["plot"]["data"])
+        self.data = get_data(self.config_json[self.ploteris_key]["data"])
 
         # get idx from filepaths
         self.data_idx = get_data_idx(
-            self.config_json["plot"]["output"][self.config_key]
+            self.config_json[self.ploteris_key]["output"][self.config_key]
         )
         self.plot_idx = get_plot_idx(
-            self.config_json["plot"]["output"][self.config_key]
+            self.config_json[self.ploteris_key]["output"][self.config_key]
         )
+
+    def get_plot_filename(self, str, data_i: int = None, plot_i: int = None) -> str:
+        str_splitter = "_" if plot_i is not None else ""
+        str_data_i = str(data_i) if data_i is not None else ""
+        str_plot_i = str(plot_i) if plot_i is not None else ""
+
+        prefix = self.config_json[self.ploteris_key]["output"][self.config_key][
+            "path_prefix"
+        ]
+        postfix = self.config_json[self.ploteris_key]["output"][self.config_key][
+            "path_postfix"
+        ]
+        return f"{prefix}{str_data_i}{str_splitter}{str_plot_i}{postfix}"
 
     # virtual
     def get_plot(self, data_i: int, plot_i: int) -> vplot.PlotlyPlot:
@@ -155,9 +163,7 @@ class Ploteris:
     def plot_plot(self, data_i: int = None, plot_i: int = None):
         assert (data_i is None) == (self.data_idx is None)
 
-        plot_filename = get_plot_filename(
-            self.config_json, self.config_key, data_i, plot_i
-        )
+        plot_filename = self.get_plot_filename(data_i, plot_i)
         plot = self.get_plot(data_i, plot_i)
         if ".html" in plot_filename:
             plot.width = None
@@ -395,10 +401,18 @@ def get_subplot_value(
     plot_step: bool = False,
     color: vplot.Color = vplot.Color.BLUE,
     dash: vplot.Dash = vplot.Dash.SOLID,
+    marker_symbol: vplot.MarkerSymbol = vplot.MarkerSymbol.CIRCLE,
+    marker_size: int = None,
     y_title: str = None,
     data_name: list[str] = None,
     legendgroup_name: str = None,
 ) -> vplot.Subplot:
+    def _mode(dash):
+        return "markers" if dash is None else "lines"
+
+    def _dash(dash):
+        return vplot.Dash.SOLID if dash is None else dash
+
     if plot_step:
         trace_function = vplot.Step
     else:
@@ -414,16 +428,23 @@ def get_subplot_value(
         assert not isinstance(color, list)
         assert not isinstance(dash, list)
         assert not isinstance(data_name, list)
-        traces += [
-            trace_function(
-                x=data.index,
-                y=data,
-                color=color,
-                dash=dash,
-                showlegend=showlegend,
-                name=data_name,
+        kwargs = {
+            "x": data.index,
+            "y": data,
+            "color": color,
+            "mode": _mode(dash),
+            "dash": _dash(dash),
+            "showlegend": showlegend,
+            "name": data_name,
+        }
+        if trace_function == vplot.Scatter:
+            kwargs.update(
+                {
+                    "marker_symbol": marker_symbol,
+                    "marker_size": marker_size,
+                }
             )
-        ]
+        traces.append(trace_function(**kwargs))
     elif len(data) == len(color):
         assert isinstance(data, list)
         assert isinstance(color, list)
@@ -431,32 +452,46 @@ def get_subplot_value(
         assert isinstance(data_name, list)
         assert len(data) == len(color) == len(dash) == len(data_name)
         for i in range(len(data)):
-            traces += [
-                trace_function(
-                    x=data[i].index,
-                    y=data[i],
-                    color=color[i],
-                    dash=dash[i],
-                    showlegend=showlegend,
-                    name=data_name[i],
+            kwargs = {
+                "x": data[i].index,
+                "y": data[i],
+                "color": color[i],
+                "mode": _mode(dash[i]),
+                "dash": _dash(dash[i]),
+                "showlegend": showlegend,
+                "name": data_name[i],
+            }
+            if trace_function == vplot.Scatter:
+                kwargs.update(
+                    {
+                        "marker_symbol": marker_symbol,
+                        "marker_size": marker_size,
+                    }
                 )
-            ]
+            traces.append(trace_function(**kwargs))
     else:
         assert isinstance(data, list)
         assert not isinstance(color, list)
         assert not isinstance(dash, list)
         assert not isinstance(data_name, list)
         for i in range(len(data)):
-            traces += [
-                trace_function(
-                    x=data[i].index,
-                    y=data[i],
-                    color=color,
-                    dash=dash,
-                    showlegend=showlegend,
-                    name=data_name,
+            kwargs = {
+                "x": data[i].index,
+                "y": data[i],
+                "color": color,
+                "mode": _mode(dash),
+                "dash": _dash(dash),
+                "showlegend": showlegend,
+                "name": data_name,
+            }
+            if trace_function == vplot.Scatter:
+                kwargs.update(
+                    {
+                        "marker_symbol": marker_symbol,
+                        "marker_size": marker_size,
+                    }
                 )
-            ]
+            traces.append(trace_function(**kwargs))
 
     subplot = vplot.Subplot(
         col=col,
@@ -564,3 +599,26 @@ def get_traces_ops(
             )
             showlegend = False
     return traces
+
+
+# html colors - https://www.w3schools.com/tags/ref_colornames.asp
+def generate_colors(
+    n: int, start_color_hex: str = "#00008B", end_color_hex: str = "#ADD8E6"
+):
+    custom_scale = plotly.colors.make_colorscale(
+        [
+            start_color_hex,
+            end_color_hex,
+        ]
+    )
+    return plotly.colors.sample_colorscale(
+        custom_scale, [i / (n - 1) for i in range(n)]
+    )
+
+
+# plotly colorscales - https://plotly.com/python/builtin-colorscales/
+#                    - https://plotly.com/python/colorscales/
+def generate_colors_plotly_colorscale(n_colors: int, colorscale_name: str = "bluered"):
+    return plotly.colors.sample_colorscale(
+        colorscale_name, [i / (n_colors - 1) for i in reversed(range(n_colors))]
+    )
