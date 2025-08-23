@@ -356,29 +356,24 @@ def get_subplot_scatter3d(
     )
 
 
-def get_subplot_heatmap2d(
+def get_subplot_heatmap(
     col,
     row,
-    x_data: pd.Series,
-    y_data: pd.Series,
-    f_data: pd.Series,
-    y_title: str = None,
+    z_data: pd.Series,
+    x_names: typing.Iterable = None,
+    y_names: typing.Iterable = None,
+    colorscale: str = "bluered",
     data_name: str = None,
-    legendgroup_name: str = None,
+    y_title: str = None,
 ) -> vplot.Subplot:
 
-    showlegend = False
-    if legendgroup_name:
-        showlegend = False
-
     traces = [
-        vplot.ScatterHeatmap2D(
-            x=x_data,
-            y=y_data,
-            f=f_data,
-            marker_size=2,
-            showlegend=showlegend,
+        vplot.Heatmap(
+            z_data=z_data,
+            x_names=x_names,
+            y_names=y_names,
             name=data_name,
+            colorscale=colorscale,
         )
     ]
 
@@ -388,7 +383,6 @@ def get_subplot_heatmap2d(
         traces=traces,
         log_y=False,
         y_title=y_title,
-        legendgroup_name=legendgroup_name,
     )
     return subplot
 
@@ -432,7 +426,6 @@ def get_subplot_value(
             "x": data.index,
             "y": data,
             "color": color,
-            "mode": _mode(dash),
             "dash": _dash(dash),
             "showlegend": showlegend,
             "name": data_name,
@@ -440,6 +433,7 @@ def get_subplot_value(
         if trace_function == vplot.Scatter:
             kwargs.update(
                 {
+                    "mode": _mode(dash),
                     "marker_symbol": marker_symbol,
                     "marker_size": marker_size,
                 }
@@ -456,7 +450,6 @@ def get_subplot_value(
                 "x": data[i].index,
                 "y": data[i],
                 "color": color[i],
-                "mode": _mode(dash[i]),
                 "dash": _dash(dash[i]),
                 "showlegend": showlegend,
                 "name": data_name[i],
@@ -464,6 +457,7 @@ def get_subplot_value(
             if trace_function == vplot.Scatter:
                 kwargs.update(
                     {
+                        "mode": _mode(dash[i]),
                         "marker_symbol": marker_symbol,
                         "marker_size": marker_size,
                     }
@@ -479,7 +473,6 @@ def get_subplot_value(
                 "x": data[i].index,
                 "y": data[i],
                 "color": color,
-                "mode": _mode(dash),
                 "dash": _dash(dash),
                 "showlegend": showlegend,
                 "name": data_name,
@@ -487,6 +480,7 @@ def get_subplot_value(
             if trace_function == vplot.Scatter:
                 kwargs.update(
                     {
+                        "mode": _mode(dash),
                         "marker_symbol": marker_symbol,
                         "marker_size": marker_size,
                     }
